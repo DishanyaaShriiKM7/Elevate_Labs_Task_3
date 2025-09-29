@@ -1,0 +1,9 @@
+#!/bin/bash
+NESSUS_SERVICE_NAME="nessusd"
+
+# this is prerm, stop the service
+test -x /etc/init.d/$NESSUS_SERVICE_NAME && /etc/init.d/$NESSUS_SERVICE_NAME stop
+
+if [ -d /run/systemd/system ]; then
+    deb-systemd-invoke stop $NESSUS_SERVICE_NAME.service >/dev/null
+fi

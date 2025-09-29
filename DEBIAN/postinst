@@ -1,0 +1,101 @@
+#!/bin/bash
+NESSUS_PRODUCT="Nessus"
+NESSUS_PREFIX="/opt/nessus"
+NESSUS_NAME="Nessus Scanner"
+NESSUS_SERVICE_NAME="nessusd"
+AGENT_UPGRADE_FLAG="/tmp/nessusagentupgrade-flag"
+
+if [ "$1" = "configure" ];
+then
+
+if [  -x /etc/rc4.d/S99${NESSUS_SERVICE_NAME} ]; then
+ rm -f /etc/rc4.d/S99${NESSUS_SERVICE_NAME} 2>/dev/null
+fi
+if [  -x /etc/rc6.d/K99${NESSUS_SERVICE_NAME} ]; then
+ rm -f /etc/rc6.d/K99${NESSUS_SERVICE_NAME} 2>/dev/null
+fi
+
+
+/usr/sbin/update-rc.d -f ${NESSUS_SERVICE_NAME} remove 1>/dev/null 2>/dev/null
+/usr/sbin/update-rc.d ${NESSUS_SERVICE_NAME} defaults 1>/dev/null 2>/dev/null
+
+# lock down the use of openssl to the owner
+/bin/chmod 0700 /opt/nessus/bin/openssl
+
+OPENSSL_CONF=/opt/nessus/etc/ /opt/nessus/bin/openssl fipsinstall -out /opt/nessus/etc/nessus/fipsmodule.cnf -module /opt/nessus/lib/nessus/fips.so
+
+echo "Unpacking $NESSUS_NAME Core Components..."
+${NESSUS_PREFIX}/sbin/nessuscli install ${NESSUS_PREFIX}/var/nessus/plugins-core.tar.gz
+
+# Check if systemd is used
+if [ -e /bin/systemctl ]; then
+  cp ${NESSUS_PREFIX}/var/nessus/tmp/$NESSUS_SERVICE_NAME.service /lib/systemd/system/$NESSUS_SERVICE_NAME.service
+
+  # Run reload to pick up the new service file
+  systemctl --system daemon-reload >/dev/null || true
+
+  # This will only remove masks created by d-s-h on package removal.
+  deb-systemd-helper unmask $NESSUS_SERVICE_NAME.service >/dev/null || true
+
+  # was-enabled defaults to true, so new installations run enable.
+  if deb-systemd-helper --quiet was-enabled $NESSUS_SERVICE_NAME.service; then
+    # Enables the unit on first installation, creates new
+    # symlinks on upgrades if the unit file has changed.
+    deb-systemd-helper enable $NESSUS_SERVICE_NAME.service >/dev/null || true
+  else
+    # Update the statefile to add new symlinks (if any), which need to be
+    # cleaned up on purge. Also remove old symlinks.
+    deb-systemd-helper update-state $NESSUS_SERVICE_NAME.service >/dev/null || true
+  fi
+else
+  cp ${NESSUS_PREFIX}/var/nessus/tmp/$NESSUS_SERVICE_NAME /etc/init.d/$NESSUS_SERVICE_NAME
+fi
+
+# Remove init and systemd files in the tmp directory after the proper one has been copied
+rm -f ${NESSUS_PREFIX}/var/nessus/tmp/$NESSUS_SERVICE_NAME.service 2>/dev/null
+rm -f ${NESSUS_PREFIX}/var/nessus/tmp/$NESSUS_SERVICE_NAME 2>/dev/null
+
+if [ "$NESSUS_PRODUCT" = "Nessus Agent" ];
+then
+
+  started=0
+  ### automatically start if this is an agent upgrade
+  if [ -f ${AGENT_UPGRADE_FLAG} ]; then
+    if [  -f "/lib/systemd/system/${NESSUS_SERVICE_NAME}.service" ]; then
+      # In the case where we are upgrading from a pre-systemd world to a systemd
+      # one, systemd may think that the service is already started, even though
+      # it was stopped by the march through the PIDs in preinst.
+      /bin/systemctl restart $NESSUS_SERVICE_NAME.service
+    else
+      /etc/init.d/$NESSUS_SERVICE_NAME start
+    fi
+    started=1
+  fi
+
+  ### otherwise tell the user how to start
+  if [[ $started = 0 ]]; then
+    if [  -f "/lib/systemd/system/${NESSUS_SERVICE_NAME}.service" ]; then
+      echo " - First, start $NESSUS_NAME by typing /bin/systemctl start $NESSUS_SERVICE_NAME.service"
+    else
+      echo " - First, start $NESSUS_NAME by typing /etc/init.d/$NESSUS_SERVICE_NAME start"
+    fi
+  fi
+
+  echo " - To link this agent, use the '$NESSUS_PREFIX/sbin/nessuscli agent' command."
+  echo "   Type '$NESSUS_PREFIX/sbin/nessuscli agent help' for more info."
+else
+  if [  -f "/lib/systemd/system/${NESSUS_SERVICE_NAME}.service" ]; then
+    echo
+    echo " - You can start $NESSUS_NAME by typing /bin/systemctl start $NESSUS_SERVICE_NAME.service"
+    echo " - Then go to https://NESSUS_HOSTNAME_OR_IP:8834/ to configure your scanner"
+    echo
+  else
+    echo
+    echo " - You can start $NESSUS_NAME by typing /etc/init.d/$NESSUS_SERVICE_NAME start"
+    echo " - Then go to https://NESSUS_HOSTNAME_OR_IP:8834/ to configure your scanner"
+    echo
+  fi
+fi
+fi
+
+rm -f $AGENT_UPGRADE_FLAG 2>/dev/null

@@ -1,0 +1,25 @@
+#!/bin/bash
+NESSUS_PREFIX="/opt/nessus"
+NESSUS_SERVICE_NAME="nessusd"
+
+if [ "$1" = "remove" ]; then
+	test -f ${NESSUS_PREFIX}/sbin/nessusd ||
+	{
+  	 /usr/sbin/update-rc.d -f $NESSUS_SERVICE_NAME remove 1>/dev/null 2>/dev/null
+
+	if [ -x "/usr/bin/deb-systemd-helper" ]; then
+  	 deb-systemd-helper purge $NESSUS_SERVICE_NAME.service >/dev/null
+  	 deb-systemd-helper unmask $NESSUS_SERVICE_NAME.service >/dev/null
+	fi
+	if [  -x /etc/init.d/${NESSUS_SERVICE_NAME} ]; then
+  	 rm -f /etc/init.d/$NESSUS_SERVICE_NAME
+	fi
+  if [ -f /lib/systemd/system/$NESSUS_SERVICE_NAME.service ]; then
+    rm -f /lib/systemd/system/$NESSUS_SERVICE_NAME.service
+    systemctl --system daemon-reload >/dev/null || true
+  fi
+	rm -f ${NESSUS_PREFIX}/var/nessus/plugins-code.db
+	rm -f ${NESSUS_PREFIX}/var/nessus/plugins-desc.db
+	}
+	exit 0
+fi

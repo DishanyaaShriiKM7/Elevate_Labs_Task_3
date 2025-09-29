@@ -1,0 +1,92 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          nessusd
+# Required-Start:    $network $local_fs $remote_fs
+# Required-Stop:     $network $local_fs $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Starts and stops the Nessus
+# Description:       Starts and stops the Nessus
+### END INIT INFO
+#
+# description: Starts and stops the Nessus Scanner
+#
+
+NESSUS_PREFIX="/opt/nessus"
+NESSUS_NAME="Nessus"
+NESSUS_SERVICE=${NESSUS_PREFIX}/sbin/nessus-service
+NESSUS_PID_FILE=${NESSUS_PREFIX}/var/nessus/nessus-service.pid
+
+test -x $NESSUS_SERVICE || {
+	echo "$NESSUS_NAME not properly installed"
+	exit 1
+}
+
+RETVAL=0
+
+
+start() {
+	KIND="$NESSUS_NAME"
+	echo -n $"Starting $NESSUS_NAME : "
+	$NESSUS_SERVICE -D -q
+	echo "."
+	return 0
+}
+
+stop() {
+	echo -n $"Shutting down $NESSUS_NAME : "
+	if [ -f "$NESSUS_PID_FILE" ]
+	then
+		pid=$(cat $NESSUS_PID_FILE)
+		if [ -n "$pid" -a -d /proc/$pid ]
+		then
+			kill $pid
+		fi
+	fi
+	echo "."
+	return 0
+}
+
+restart() {
+	stop
+	sleep 3
+	start
+}
+
+status() {
+	if [ -f "$NESSUS_PID_FILE" ]
+	then
+		exp_pid=$(cat $NESSUS_PID_FILE)
+		pid_dir="/proc/$exp_pid"
+		if [ -d "$pid_dir" ]
+		then
+			if [ "$(cat ${pid_dir}/stat | awk '{print $2}' | tr -d '()')" == "nessus-service" ]
+			then
+				echo "$NESSUS_NAME is running"
+				return 0
+			fi
+		fi
+	fi
+	echo "$NESSUS_NAME is not running"
+	return 3
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart)
+		restart
+		;;
+	status)
+		status
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|restart|status}"
+		exit 1
+esac
+
+exit $?

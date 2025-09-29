@@ -1,0 +1,30 @@
+#!/bin/bash
+NESSUS_PREFIX="/opt/nessus"
+NESSUS_SERVICE_NAME="nessusd"
+NESSUS_SERVICE_BIN="${NESSUS_PREFIX}/sbin/nessus-service"
+NESSUSD_BIN="${NESSUS_PREFIX}/sbin/nessusd"
+AGENT_UPGRADE_FLAG="/tmp/nessusagentupgrade-flag"
+
+test -x /etc/init.d/$NESSUS_SERVICE_NAME && /etc/init.d/$NESSUS_SERVICE_NAME stop
+test -f /lib/systemd/system/$NESSUS_SERVICE_NAME && /bin/systemctl stop $NESSUS_SERVICE_NAME.service
+# Because we did not used to shut down on uninstall, we might have some random nessusd's running on the system (see NES-3585)
+# We therefore need to do a killall before we install a new nessusd
+
+# Look at all the proc entries and kill all nessus-service and nessusd processes with the correct path
+for dir in /proc/[0-9]*
+do
+	full_exe_path=$(readlink ${dir}/exe)
+	pid=$(basename ${dir})
+	if [ "$full_exe_path" == "$NESSUS_SERVICE_BIN" -o "$full_exe_path" == "$NESSUSD_BIN" ]
+	then
+		kill $pid
+	fi
+done
+
+rm -f $AGENT_UPGRADE_FLAG 2>/dev/null
+if [ "$1" = "upgrade" ]
+then
+    touch $AGENT_UPGRADE_FLAG 2>/dev/null
+fi
+
+exit 0

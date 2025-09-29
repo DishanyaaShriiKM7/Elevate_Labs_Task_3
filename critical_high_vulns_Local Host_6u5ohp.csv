@@ -1,0 +1,3 @@
+Host,Port,Service,Vulnerability,Severity,CVE,Solution
+127.0.0.1,0,general,Ruby REXML 3.3.3 < 3.4.2 DoS vulnerability,3,CVE-2025-58767,Upgrade to REXML version 3.4.2 or later.
+127.0.0.1,0,general,Ruby REXML 3.3.3 < 3.4.2 DoS vulnerability,3,CVE-2025-58767,Upgrade to REXML version 3.4.2 or later.

@@ -1,0 +1,9 @@
+Package: Nessus 
+Version: 10.9.4
+Section:
+Priority: extra
+Architecture: amd64
+Maintainer: Mr. Packages <mrpackage@nessus.org>
+Description: The Nessus Vulnerability Scanner
+Conflicts: nessusd (<< 3.0)
+Replaces: nessusd (<< 3.0)
